@@ -28,32 +28,79 @@ def createObjState(obj):
     pos = pos.translate({ord(c):'' for c in ' ()'})
     pos = [float(i) for i in pos.split(',')]
     assert len(pos) == 16, f'Failed parsing: {str(obj.Placement.Matrix)}'
+    color = None
+    material = None
+    transparency = 0
+    if obj.TypeId == 'App::Link':
+        material = obj.ViewObject.OverrideMaterial
+        color = obj.ViewObject.ShapeMaterial.DiffuseColor
+        transparency = obj.ViewObject.ShapeMaterial.Transparency
     return {
         'name': obj.Name,
         'pos': pos,
         'visible': obj.Visibility,
+        'material': material,
+        'color': color,
+        'transparency': transparency,
     }
 
-def diffObjState(s1, s2):
-    if s1['pos'] != s2['pos']:
-        return s2
-    if s1['visible'] != s2['visible']:
-        return s2
-    return None
+
+def newMaterial(color=None, transparency=None):
+    m = App.Material(
+        DiffuseColor=(tuple(color or (0.80, 0.80, 0.80))[:3]),
+        AmbientColor=(0.20, 0.20, 0.20),
+        SpecularColor=(0.00, 0.00, 0.00),
+        EmissiveColor=(0.00, 0.00, 0.00),
+        Shininess=(0.20),
+        Transparency=(float(transparency or 0.00)),
+    )
+    return m
+
+
+def interpolate(v1, v2, delta):
+    return v1 + (v2 - v1)*delta
+
+
+def interpolateMaterial(s1, s2, delta):
+    r = interpolate(s1.DiffuseColor[0], s2.DiffuseColor[0], delta)
+    g = interpolate(s1.DiffuseColor[1], s2.DiffuseColor[1], delta)
+    b = interpolate(s1.DiffuseColor[2], s2.DiffuseColor[2], delta)
+    t = interpolate(s1.Transparency, s2.Transparency, delta)
+    return newMaterial((r, g, b), t)
 
 
 def applyObjState(state):
     obj = Doc().getObject(state['name'])
-    if obj:
-        obj.Placement = state['pos'].copy()
-        obj.Visibility = state['visible']
+    if not obj:
+        return
+    obj.Placement = state['pos'].copy()
+    obj.Visibility = state['visible']
+    if obj.TypeId == 'App::Link' and 'material' in state:
+        if state['material']:
+            obj.ViewObject.OverrideMaterial = True
+            obj.ViewObject.ShapeMaterial = state['material']
+        else:
+            obj.ViewObject.OverrideMaterial = False
+            obj.ViewObject.ShapeMaterial = newMaterial()
 
 
 def animObjState(s1, s2, delta):
     obj = Doc().getObject(s1['name'])
-    if obj:
-        obj.Placement = s1['pos'].slerp(s2['pos'], delta)
-        obj.Visibility = s2['visible']
+    if not obj:
+        return
+    obj.Placement = s1['pos'].slerp(s2['pos'], delta)
+    obj.Visibility = s2['visible']
+    if obj.TypeId == 'App::Link' and ('material' in s1 or 'material' in s2):
+        if s1['material'] or s2['material']:
+            obj.ViewObject.OverrideMaterial = True
+            obj.ViewObject.ShapeMaterial = interpolateMaterial(
+                s1['material'] or newMaterial(),
+                s2['material'] or newMaterial(),
+                delta
+            )
+        else:
+            obj.ViewObject.OverrideMaterial = False
+            obj.ViewObject.ShapeMaterial = newMaterial()
 
 
 def getState():
@@ -69,16 +116,6 @@ def getState():
 
     App.Console.PrintMessage(f'state: {state}\n')
     return state
-
-
-def diffState(s1, s2):
-    diff = {}
-    for name, state in s1.items():
-        if name in s2:
-            delta = diffObjState(state, s2[name])
-            if delta:
-                diff[name] = delta
-    return diff
 
 
 def newProp(obj, name, type_, value, subsection="", tooltip=""):
@@ -201,6 +238,7 @@ class Animation:
 
     def play(self):
         prev = None
+        Gui.runCommand('Std_DrawStyle', 5)
         STATE['play'] = True
         for obj in self.obj.Group:
             step = self.steps[obj.Name]
@@ -217,6 +255,7 @@ class Animation:
             if not STATE['play']:
                 break
         STATE['play'] = False
+        Gui.runCommand('Std_DrawStyle', 6)
         App.activeDocument().recompute(None, True, True)
 
     def video(self):
@@ -234,6 +273,7 @@ class Animation:
         prev = None
         STATE['render'] = True
         STATE['play'] = True
+        Gui.runCommand('Std_DrawStyle', 5)
         for obj in self.obj.Group:
             step = self.steps[obj.Name]
             App.Console.PrintError(f'step {step.name}\n')
@@ -249,6 +289,7 @@ class Animation:
             prev = step
             if not STATE['play']:
                 break
+        Gui.runCommand('Std_DrawStyle', 6)
         vr.end()
         STATE['play'] = False
         STATE['render'] = False
@@ -298,6 +339,11 @@ class Step:
         App.Console.PrintMessage(f'load state: {self.state}\n')
         for value in self.state.values():
             value['pos'] = App.Placement(App.Matrix(*value['pos']))
+            if value['material']:
+                value['material'] = newMaterial(
+                    value['color'],
+                    value['transparency']
+                )
         App.Console.PrintMessage(f'after state: {self.state}\n')
 
     def apply(self):
