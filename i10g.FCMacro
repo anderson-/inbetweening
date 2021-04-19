@@ -200,16 +200,18 @@ class Animation:
     def play(self):
         prev = None
         STATE['play'] = True
-        for step in self.steps.values():
+        for obj in self.obj.Group:
+            step = self.steps[obj.Name]
             if prev is None:
                 prev = step
                 continue
-            for delta in numpy.arange(0, 1, 1/(step.frames-1)):
+            for delta in numpy.append(numpy.arange(0, 1, 1/(step.frames-1)), 1):
                 step.anim(prev, delta)
                 Gui.updateGui()
                 time.sleep(0.01)
                 if not STATE['play']:
                     break
+            prev = step
             if not STATE['play']:
                 break
         STATE['play'] = False
@@ -229,23 +231,26 @@ class Animation:
         vr.begin(name, w, h, bg, fps)
         prev = None
         STATE['render'] = True
-        for step in self.steps.values():
+        STATE['play'] = True
+        for obj in self.obj.Group:
+            step = self.steps[obj.Name]
+            App.Console.PrintError(f'step {step.name}\n')
             if prev is None:
                 prev = step
                 continue
-            for delta in numpy.arange(0, 1, 1/(step.frames-1)):
+            for delta in numpy.append(numpy.arange(0, 1, 1/(step.frames-1)), 1):
                 step.anim(prev, delta)
                 Gui.updateGui()
                 vr.addFrame()
                 if not STATE['play']:
                     break
-                # time.sleep(0.01)
+            prev = step
             if not STATE['play']:
                 break
         vr.end()
+        STATE['play'] = False
         STATE['render'] = False
         App.activeDocument().recompute(None, True, True)
-
 
     def __getstate__(self):
         return None
@@ -261,6 +266,7 @@ class Step:
         self.obj = obj
         self.name = self.obj.Name
         self.updateState()
+        obj.ViewObject.signalChangeIcon()
 
     def onChanged(self, fp, prop):
         App.Console.PrintMessage(f'onChanged\n')
@@ -590,9 +596,5 @@ if __name__ == '__main__':
     App.Animation = Animation
     STATE['selection'] = StepSelectionCallback()
     STATE['animation'] = App.Animation.getInstance()
-
-    # selection = Gui.Selection.getCompleteSelection() #TODO
-    # if selection and selection[0] in STATE['animation'].obj.Group:
-    #     STATE['frame'] = STATE['animation'].obj.Group.index(selection[0])
     init()
 
