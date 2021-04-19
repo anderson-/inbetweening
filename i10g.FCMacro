@@ -33,7 +33,7 @@ def createObjState(obj):
     transparency = 0
     if obj.TypeId == 'App::Link':
         material = obj.ViewObject.OverrideMaterial
-        color = obj.ViewObject.ShapeMaterial.DiffuseColor
+        color = list(obj.ViewObject.ShapeMaterial.DiffuseColor)[:3]
         transparency = obj.ViewObject.ShapeMaterial.Transparency
     return {
         'name': obj.Name,
@@ -84,12 +84,12 @@ def applyObjState(state):
             obj.ViewObject.ShapeMaterial = newMaterial()
 
 
-def animObjState(s1, s2, delta):
-    obj = Doc().getObject(s1['name'])
+def animObjState(obj, s1, s2, delta):
     if not obj:
         return
     obj.Placement = s1['pos'].slerp(s2['pos'], delta)
-    obj.Visibility = s2['visible']
+    if obj.Visibility != s2['visible']:
+        obj.Visibility = s2['visible']
     if obj.TypeId == 'App::Link' and ('material' in s1 or 'material' in s2):
         if s1['material'] or s2['material']:
             obj.ViewObject.OverrideMaterial = True
@@ -98,7 +98,7 @@ def animObjState(s1, s2, delta):
                 s2['material'] or newMaterial(),
                 delta
             )
-        else:
+        elif obj.ViewObject.OverrideMaterial:
             obj.ViewObject.OverrideMaterial = False
             obj.ViewObject.ShapeMaterial = newMaterial()
 
@@ -344,6 +344,7 @@ class Step:
                     value['color'],
                     value['transparency']
                 )
+            value['obj'] = Doc().getObject(value['name'])
         App.Console.PrintMessage(f'after state: {self.state}\n')
 
     def apply(self):
@@ -353,7 +354,7 @@ class Step:
 
     def anim(self, prev, delta):
         for name, objState in self.state.items():
-            animObjState(prev.state[name], objState, delta)
+            animObjState(objState['obj'], prev.state[name], objState, delta)
 
     def __getstate__(self):
         return None
@@ -443,7 +444,7 @@ class FirstFrameCmd():
         Gui.Selection.addSelection(a.obj.Group[0])
 
     def IsActive(self):
-        return STATE['play'] == False and STATE['frame'] != 0
+        return STATE['frame'] != 0 and not STATE['play']
 
 
 class PrevFrameCmd():
@@ -460,7 +461,7 @@ class PrevFrameCmd():
         Gui.Selection.addSelection(a.obj.Group[STATE['frame'] - 1])
 
     def IsActive(self):
-        return STATE['play'] == False and STATE['frame'] != 0
+        return STATE['frame'] != 0 and not STATE['play']
 
 
 class PlayCtrlCmd():
@@ -475,7 +476,7 @@ class PlayCtrlCmd():
         STATE['animation'].play()
 
     def IsActive(self):
-        return STATE['play'] == False
+        return not STATE['play']
 
 
 class PauseCtrlCmd():
@@ -490,7 +491,7 @@ class PauseCtrlCmd():
         STATE['play'] = False
 
     def IsActive(self):
-        return STATE['play'] == True
+        return STATE['play'] and not STATE['render']
 
 
 class NextFrameCmd():
@@ -507,7 +508,7 @@ class NextFrameCmd():
         Gui.Selection.addSelection(a.obj.Group[STATE['frame'] + 1])
 
     def IsActive(self):
-        return STATE['play'] == False and STATE['frame'] < STATE['fcount'] - 1
+        return STATE['frame'] < STATE['fcount'] - 1 and not STATE['play']
 
 
 class LastFrameCmd():
@@ -524,7 +525,7 @@ class LastFrameCmd():
         Gui.Selection.addSelection(a.obj.Group[STATE['fcount'] - 1])
 
     def IsActive(self):
-        return STATE['play'] == False and STATE['frame'] < STATE['fcount'] - 1
+        return STATE['frame'] < STATE['fcount'] - 1 and not STATE['play']
 
 
 class AddFrameCmd():
@@ -540,7 +541,7 @@ class AddFrameCmd():
         a.addStep()
 
     def IsActive(self):
-        return True
+        return not STATE['play']
 
 class CopyFrameCmd():
     def GetResources(self):
@@ -561,7 +562,7 @@ class CopyFrameCmd():
     def IsActive(self):
         selection = Gui.Selection.getCompleteSelection()
         return len(selection) == 1 and \
-            selection[0] in STATE['animation'].obj.Group
+            selection[0] in STATE['animation'].obj.Group and not STATE['play']
 
 
 class UpdateFrameCmd():
@@ -578,7 +579,7 @@ class UpdateFrameCmd():
         a.steps[obj.Name].updateState(True)
 
     def IsActive(self):
-        return True
+        return not STATE['play']
 
 
 class RenderCmd():
@@ -593,7 +594,8 @@ class RenderCmd():
         STATE['animation'].video()
 
     def IsActive(self):
-        return Animation.getObject().getPropertyByName('FFmpeg') != ''
+        return not STATE['play'] and \
+            Animation.getObject().getPropertyByName('FFmpeg') != ''
 
 
 class StopRenderCmd():
