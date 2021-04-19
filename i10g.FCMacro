@@ -8,16 +8,31 @@ import FreeCAD as App
 import FreeCADGui as Gui
 
 
+IGNORELIST = ['App::Origin', 'App::Line', 'App::Plane']
 FILEPATH = os.path.dirname(__file__)
+STATE = {
+    'frame': 0,
+    'render': False,
+    'play': False,
+    'animation': None,
+    'selection': None,
+}
+
+
+def Doc():
+    return App.ActiveDocument
 
 
 def createObjState(obj):
+    pos = str(obj.Placement.Matrix).split('Matrix')[1]
+    pos = pos.translate({ord(c):'' for c in ' ()'})
+    pos = [float(i) for i in pos.split(',')]
+    assert len(pos) == 16, f'Failed parsing: {str(obj.Placement.Matrix)}'
     return {
         'name': obj.Name,
-        'pos': str(obj.Placement.Matrix),
+        'pos': pos,
         'visible': obj.Visibility,
     }
-
 
 def diffObjState(s1, s2):
     if s1['pos'] != s2['pos']:
@@ -28,23 +43,23 @@ def diffObjState(s1, s2):
 
 
 def applyObjState(state):
-    obj = App.ActiveDocument.getObject(state['name'])
+    obj = Doc().getObject(state['name'])
     obj.Placement = state['pos'].copy()
     obj.Visibility = state['visible']
 
 
 def animObjState(s1, s2, delta):
-    obj = App.ActiveDocument.getObject(s1['name'])
+    obj = Doc().getObject(s1['name'])
     obj.Placement = s1['pos'].slerp(s2['pos'], delta)
     obj.Visibility = s2['visible']
 
 
 def getState():
-    objs = App.ActiveDocument.findObjects()
+    objs = Doc().findObjects()
     state = {}
 
     for obj in objs:
-        if obj.TypeId not in ['App::Origin', 'App::Line', 'App::Plane']:
+        if hasattr(obj, 'Placement') and obj.TypeId not in IGNORELIST:
             if obj.TypeId not in ['App::Link', 'App::Part']:
                 App.Console.PrintWarning(f'warning: found {obj.FullName} as {obj.TypeId}\n')
                 continue
@@ -114,12 +129,11 @@ class VideoRenderer:
         App.Console.PrintMessage(f'Done wrote {self.count} frames\n')
 
 
-
 class Animation:
 
     @staticmethod
     def getObject():
-        return App.ActiveDocument.getObject('Animation')
+        return Doc().getObject('Animation')
 
     @staticmethod
     def getInstance():
@@ -127,18 +141,16 @@ class Animation:
 
     def __init__(self, obj=None):
         if not obj:
-            obj = App.ActiveDocument.addObject('App::DocumentObjectGroupPython', 'Animation')
+            obj = Doc().addObject('App::DocumentObjectGroupPython', 'Animation')
+        self.obj = obj
         self.steps = {}
         for step in obj.Group:
             self.steps[step.Name] = Step(step)
         if not obj.Group:
             self.addStep()
-        self.obj = obj
         obj.Proxy = self
         obj.ViewObject.Proxy = self
         # Properties
-        newProp(obj, 'ExportVideo', 'Bool', False, 'Animation')
-        newProp(obj, 'Animate', 'Bool', False, 'Animation')
         newProp(obj, 'OutputFilename', 'File', 'video.mp4', 'Video')
         newProp(obj, 'FFmpeg', 'File', '', 'Video')
         newProp(obj, 'Width', 'Integer', 1080, 'Video')
@@ -150,16 +162,6 @@ class Animation:
 
     def onChanged(self, fp, prop):
         App.Console.PrintMessage(f'onChanged {prop}\n')
-        if prop == 'ExportVideo':
-            if fp.getPropertyByName('ExportVideo'):
-                self.video()
-                setattr(fp, 'ExportVideo', False)
-                Gui.updateGui()
-        if prop == 'Animate':
-            if fp.getPropertyByName('Animate'):
-                self.play()
-                setattr(fp, 'Animate', False)
-                Gui.updateGui()
         pass
 
     def execute(self, fp):
@@ -168,14 +170,36 @@ class Animation:
     def getIcon(self):
         return f'{FILEPATH}/icons_i10g/animation.svg'
 
-    def addStep(self):
-        obj = App.ActiveDocument.addObject('App::DocumentObjectGroupPython', 'Step')
-        step = Step(obj)
-        self.steps[obj.Name] = step
-        Animation.getObject().addObject(obj)
+    def addStep(self, before=None):
+        if not before:
+            id = 'Step{:0>3d}'.format(len(self.obj.Group))
+            obj = Doc().addObject('App::DocumentObjectGroupPython', f'Step')
+            App.Console.PrintError(f'---{id}\n')
+            obj.Label = id
+            step = Step(obj)
+            self.steps[obj.Name] = step
+            self.obj.addObject(obj)
+            App.Console.PrintError(f'addStep\n')
+        else:
+            App.Console.PrintError(f'addStep{before}\n')
+            tmp = Doc().addObject('App::DocumentObjectGroupPython', 'TMPGroup')
+            for i in range(len(self.obj.Group) - before):
+                App.Console.PrintError(f'remove{before}\n')
+                obj = self.obj.removeObject(self.obj.Group[before])[0]
+                obj.Label = f'_{obj.Label}'
+                tmp.addObject(obj)
+            self.addStep()
+            id0 = len(self.obj.Group)
+            for i in range(len(tmp.Group)):
+                App.Console.PrintError(f'add0\n')
+                obj = tmp.removeObject(tmp.Group[0])[0]
+                obj.Label = 'Step{:0>3d}'.format(id0 + i)
+                self.obj.addObject(obj)
+            Doc().removeObject(tmp.Name)
 
     def play(self):
         prev = None
+        STATE['play'] = True
         for step in self.steps.values():
             if prev is None:
                 prev = step
@@ -184,6 +208,12 @@ class Animation:
                 step.anim(prev, delta)
                 Gui.updateGui()
                 time.sleep(0.01)
+                if not STATE['play']:
+                    break
+            if not STATE['play']:
+                break
+        STATE['play'] = False
+        App.activeDocument().recompute(None, True, True)
 
     def video(self):
         name = self.obj.getPropertyByName('OutputFilename')
@@ -198,6 +228,7 @@ class Animation:
         vr = VideoRenderer(ffmpeg)
         vr.begin(name, w, h, bg, fps)
         prev = None
+        STATE['render'] = True
         for step in self.steps.values():
             if prev is None:
                 prev = step
@@ -206,8 +237,14 @@ class Animation:
                 step.anim(prev, delta)
                 Gui.updateGui()
                 vr.addFrame()
+                if not STATE['play']:
+                    break
                 # time.sleep(0.01)
+            if not STATE['play']:
+                break
         vr.end()
+        STATE['render'] = False
+        App.activeDocument().recompute(None, True, True)
 
 
     def __getstate__(self):
@@ -221,20 +258,9 @@ class Step:
     def __init__(self, obj):
         obj.Proxy = self
         obj.ViewObject.Proxy = self
-        # Properties
-        newProp(obj, 'Frames', 'Integer', 30, 'Animation')
-        newProp(obj, 'State', 'PythonObject', getState())
-        self.state = copy.deepcopy(obj.getPropertyByName('State'))
-        self.frames = obj.getPropertyByName('Frames')
-        self.name = obj.Name
         self.obj = obj
-
-        App.Console.PrintMessage(f'load state: {self.state}\n')
-        for value in self.state.values():
-            pos = [float(i) for i in re.findall('-?\d+\.?\d*', value['pos'])]
-            assert len(pos) == 16
-            value['pos'] = App.Placement(App.Matrix(*pos))
-        App.Console.PrintMessage(f'after state: {self.state}\n')
+        self.name = self.obj.Name
+        self.updateState()
 
     def onChanged(self, fp, prop):
         App.Console.PrintMessage(f'onChanged\n')
@@ -245,11 +271,31 @@ class Step:
         App.Console.PrintMessage(f'execute\n')
 
     def getIcon(self):
+        a = STATE['animation']
+        if a and STATE['frame'] == a.obj.Group.index(self.obj):
+            App.Console.PrintMessage(f'getIcon2 {id} {self.obj.Label}\n')
+            return f'{FILEPATH}/icons_i10g/selected_step.svg'
+        App.Console.PrintMessage(f'getIcon {id} {self.obj.Label}\n')
         return f'{FILEPATH}/icons_i10g/step.svg'
+
+    def updateState(self, force=False):
+        if force:
+            self.obj.removeProperty('DocState')
+        # Properties
+        newProp(self.obj, 'Frames', 'Integer', 30, 'Animation')
+        newProp(self.obj, 'DocState', 'PythonObject', getState())
+        self.state = copy.deepcopy(self.obj.getPropertyByName('DocState'))
+        self.frames = self.obj.getPropertyByName('Frames')
+
+        App.Console.PrintMessage(f'load state: {self.state}\n')
+        for value in self.state.values():
+            value['pos'] = App.Placement(App.Matrix(*value['pos']))
+        App.Console.PrintMessage(f'after state: {self.state}\n')
 
     def apply(self):
         for objState in self.state.values():
             applyObjState(objState)
+        App.activeDocument().recompute(None, True, True)
 
     def anim(self, prev, delta):
         for name, objState in self.state.items():
@@ -267,13 +313,286 @@ class StepSelectionCallback:
         Gui.Selection.addObserver(self)
 
     def addSelection(self, doc, obj, sub, pos):
-        a = App.Animation.getInstance()
+        a = STATE['animation']
         if obj in a.steps:
+            oldSelectedObj = a.obj.Group[STATE['frame']]
+            selectedObj = a.steps[obj].obj
+            STATE['frame'] = a.obj.Group.index(selectedObj)
+            oldSelectedObj.ViewObject.signalChangeIcon()
+            selectedObj.ViewObject.signalChangeIcon()
+            STATE['fcount'] = len(a.obj.Group)
+            App.Console.PrintMessage(f'Selected frame {STATE["frame"]}\n')
             a.steps[obj].apply()
 
 
+class Inbetweening(Gui.Workbench):
+    MenuText = 'Inbetweening'
+    ToolTip = 'Simple Animation Workbench'
+    Icon = f'{FILEPATH}/icons_i10g/i10g.svg'
+
+    def GetClassName(self):
+        return 'Gui::PythonWorkbench'
+
+    def Initialize(self):
+        App.Console.PrintMessage(f'Initialize workbench {id(self)}\n')
+        self.appendToolbar(f'TestTools{id(self)}', ['ReloadMacro'])
+        self.appendToolbar(f'Control{id(self)}', [
+            'FirstFrameCmd', 'PrevFrameCmd', 'PlayCtrlCmd',
+            'PauseCtrlCmd', 'NextFrameCmd', 'LastFrameCmd',
+        ])
+        self.appendToolbar(f'Tools{id(self)}', [
+            'AddFrameCmd', 'CopyFrameCmd', 'UpdateFrameCmd',
+        ])
+        self.appendToolbar(f'Render{id(self)}', [
+            'RenderCmd', 'StopRenderCmd',
+        ])
+
+    def Activated(self):
+        pass
+
+    def Deactivated(self):
+        pass
+
+
+class ReloadMacro():
+    def GetResources(self):
+        return {'Pixmap': f'{FILEPATH}/icons_i10g/reload.svg',
+                'MenuText': 'Reload Macro',
+                'ToolTip': 'Reload Macro'}
+
+    def Activated(self):
+        App.Console.PrintMessage(f'Reloading macro. Command {id(self)}\n')
+        try:
+            Gui.Selection.removeObserver(STATE['selection'])
+        except:
+            pass
+        Gui.activateWorkbench('StartWorkbench')
+        Gui.removeWorkbench('Inbetweening')
+        Gui.runCommand('Std_RecentMacros', 0)
+        Gui.activateWorkbench('Inbetweening')
+
+    def IsActive(self):
+        return True
+
+
+class FirstFrameCmd():
+    def GetResources(self):
+        return {
+            'Pixmap': f'{FILEPATH}/icons_i10g/first_frame.svg',
+            'MenuText': 'Jump to first step',
+            'ToolTip': 'Jump to first step',
+        }
+
+    def Activated(self):
+        a = STATE['animation']
+        Gui.Selection.clearSelection()
+        Gui.Selection.addSelection(a.obj.Group[0])
+
+    def IsActive(self):
+        return STATE['play'] == False and STATE['frame'] != 0
+
+
+class PrevFrameCmd():
+    def GetResources(self):
+        return {
+            'Pixmap': f'{FILEPATH}/icons_i10g/prev_frame.svg',
+            'MenuText': 'Previous step',
+            'ToolTip': 'Previous step',
+        }
+
+    def Activated(self):
+        a = STATE['animation']
+        Gui.Selection.clearSelection()
+        Gui.Selection.addSelection(a.obj.Group[STATE['frame'] - 1])
+
+    def IsActive(self):
+        return STATE['play'] == False and STATE['frame'] != 0
+
+
+class PlayCtrlCmd():
+    def GetResources(self):
+        return {
+            'Pixmap': f'{FILEPATH}/icons_i10g/play.svg',
+            'MenuText': 'Play animation',
+            'ToolTip': 'Play animation',
+        }
+
+    def Activated(self):
+        STATE['animation'].play()
+
+    def IsActive(self):
+        return STATE['play'] == False
+
+
+class PauseCtrlCmd():
+    def GetResources(self):
+        return {
+            'Pixmap': f'{FILEPATH}/icons_i10g/pause.svg',
+            'MenuText': 'Pause animation',
+            'ToolTip': 'Pause animation',
+        }
+
+    def Activated(self):
+        STATE['play'] = False
+
+    def IsActive(self):
+        return STATE['play'] == True
+
+
+class NextFrameCmd():
+    def GetResources(self):
+        return {
+            'Pixmap': f'{FILEPATH}/icons_i10g/next_frame.svg',
+            'MenuText': 'Next step',
+            'ToolTip': 'Next step',
+        }
+
+    def Activated(self):
+        a = STATE['animation']
+        Gui.Selection.clearSelection()
+        Gui.Selection.addSelection(a.obj.Group[STATE['frame'] + 1])
+
+    def IsActive(self):
+        return STATE['play'] == False and STATE['frame'] < STATE['fcount'] - 1
+
+
+class LastFrameCmd():
+    def GetResources(self):
+        return {
+            'Pixmap': f'{FILEPATH}/icons_i10g/last_frame.svg',
+            'MenuText': 'Jump to last step',
+            'ToolTip': 'Jump to last step',
+        }
+
+    def Activated(self):
+        a = STATE['animation']
+        Gui.Selection.clearSelection()
+        Gui.Selection.addSelection(a.obj.Group[STATE['fcount'] - 1])
+
+    def IsActive(self):
+        return STATE['play'] == False and STATE['frame'] < STATE['fcount'] - 1
+
+
+class AddFrameCmd():
+    def GetResources(self):
+        return {
+            'Pixmap': f'{FILEPATH}/icons_i10g/add.svg',
+            'MenuText': 'Add Step',
+            'ToolTip': 'Add Step',
+        }
+
+    def Activated(self):
+        a = STATE['animation']
+        a.addStep()
+
+    def IsActive(self):
+        return True
+
+class CopyFrameCmd():
+    def GetResources(self):
+        return {
+            'Pixmap': f'{FILEPATH}/icons_i10g/copy.svg',
+            'MenuText': 'Copy Step',
+            'ToolTip': 'Copy Step',
+        }
+
+    def Activated(self):
+        a = STATE['animation']
+        selection = Gui.Selection.getCompleteSelection()
+        if selection[0] == STATE['animation'].obj.Group[-1]:
+            a.addStep()
+        else:
+            a.addStep(before=STATE['frame'] + 1)
+
+    def IsActive(self):
+        selection = Gui.Selection.getCompleteSelection()
+        return len(selection) == 1 and \
+            selection[0] in STATE['animation'].obj.Group
+
+
+class UpdateFrameCmd():
+    def GetResources(self):
+        return {
+            'Pixmap': f'{FILEPATH}/icons_i10g/update.svg',
+            'MenuText': 'Update Step',
+            'ToolTip': 'Update Step',
+        }
+
+    def Activated(self):
+        a = STATE['animation']
+        obj = a.obj.Group[STATE['frame']]
+        a.steps[obj.Name].updateState(True)
+
+    def IsActive(self):
+        return True
+
+
+class RenderCmd():
+    def GetResources(self):
+        return {
+            'Pixmap': f'{FILEPATH}/icons_i10g/render.svg',
+            'MenuText': 'Render Animation',
+            'ToolTip': 'Export video file',
+        }
+
+    def Activated(self):
+        STATE['animation'].video()
+
+    def IsActive(self):
+        return Animation.getObject().getPropertyByName('FFmpeg') != ''
+
+
+class StopRenderCmd():
+    def GetResources(self):
+        return {
+            'Pixmap': f'{FILEPATH}/icons_i10g/abort.svg',
+            'MenuText': 'Abort Render',
+            'ToolTip': 'Cancel Export',
+        }
+
+    def Activated(self):
+        STATE['play'] = False
+
+    def IsActive(self):
+        return STATE['play'] and STATE['render']
+
+
+def init():
+    # Commands
+    Gui.addCommand('ReloadMacro', ReloadMacro())
+    cmds = [
+        FirstFrameCmd,
+        PrevFrameCmd,
+        PlayCtrlCmd,
+        PauseCtrlCmd,
+        NextFrameCmd,
+        LastFrameCmd,
+        AddFrameCmd,
+        CopyFrameCmd,
+        UpdateFrameCmd,
+        RenderCmd,
+        StopRenderCmd,
+    ]
+    for cmd in cmds:
+        Gui.addCommand(cmd.__name__, cmd())
+
+    # Workbench
+    try:
+        Gui.activateWorkbench('Inbetweening')
+        Gui.removeWorkbench('Inbetweening')
+    except:
+        pass
+    Gui.addWorkbench(Inbetweening())
+    Gui.activateWorkbench('Inbetweening')
+
+
 if __name__ == '__main__':
-    StepSelectionCallback()
     App.Animation = Animation
-    App.Animation.getInstance()
+    STATE['selection'] = StepSelectionCallback()
+    STATE['animation'] = App.Animation.getInstance()
+
+    # selection = Gui.Selection.getCompleteSelection() #TODO
+    # if selection and selection[0] in STATE['animation'].obj.Group:
+    #     STATE['frame'] = STATE['animation'].obj.Group.index(selection[0])
+    init()
 
