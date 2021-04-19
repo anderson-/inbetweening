@@ -44,14 +44,16 @@ def diffObjState(s1, s2):
 
 def applyObjState(state):
     obj = Doc().getObject(state['name'])
-    obj.Placement = state['pos'].copy()
-    obj.Visibility = state['visible']
+    if obj:
+        obj.Placement = state['pos'].copy()
+        obj.Visibility = state['visible']
 
 
 def animObjState(s1, s2, delta):
     obj = Doc().getObject(s1['name'])
-    obj.Placement = s1['pos'].slerp(s2['pos'], delta)
-    obj.Visibility = s2['visible']
+    if obj:
+        obj.Placement = s1['pos'].slerp(s2['pos'], delta)
+        obj.Visibility = s2['visible']
 
 
 def getState():
