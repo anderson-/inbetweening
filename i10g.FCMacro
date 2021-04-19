@@ -1,0 +1,279 @@
+import os
+import re
+import time
+import copy
+import numpy
+import subprocess
+import FreeCAD as App
+import FreeCADGui as Gui
+
+
+FILEPATH = os.path.dirname(__file__)
+
+
+def createObjState(obj):
+    return {
+        'name': obj.Name,
+        'pos': str(obj.Placement.Matrix),
+        'visible': obj.Visibility,
+    }
+
+
+def diffObjState(s1, s2):
+    if s1['pos'] != s2['pos']:
+        return s2
+    if s1['visible'] != s2['visible']:
+        return s2
+    return None
+
+
+def applyObjState(state):
+    obj = App.ActiveDocument.getObject(state['name'])
+    obj.Placement = state['pos'].copy()
+    obj.Visibility = state['visible']
+
+
+def animObjState(s1, s2, delta):
+    obj = App.ActiveDocument.getObject(s1['name'])
+    obj.Placement = s1['pos'].slerp(s2['pos'], delta)
+    obj.Visibility = s2['visible']
+
+
+def getState():
+    objs = App.ActiveDocument.findObjects()
+    state = {}
+
+    for obj in objs:
+        if obj.TypeId not in ['App::Origin', 'App::Line', 'App::Plane']:
+            if obj.TypeId not in ['App::Link', 'App::Part']:
+                App.Console.PrintWarning(f'warning: found {obj.FullName} as {obj.TypeId}\n')
+                continue
+            state[obj.Name] = createObjState(obj)
+
+    App.Console.PrintMessage(f'state: {state}\n')
+    return state
+
+
+def diffState(s1, s2):
+    diff = {}
+    for name, state in s1.items():
+        if name in s2:
+            delta = diffObjState(state, s2[name])
+            if delta:
+                diff[name] = delta
+    return diff
+
+
+def newProp(obj, name, type_, value, subsection="", tooltip=""):
+    if name in obj.PropertiesList:
+        return
+    obj.addProperty(f'App::Property{type_}', name, subsection, tooltip)
+    setattr(obj, name, value)
+
+
+class VideoRenderer:
+
+    def __init__(self, ffmpeg):
+        self.ffmpeg = ffmpeg
+        self.pipein, self.pipeout = (None, None)
+        self.tmpfile = '/tmp/stream.png'
+
+    def begin(self, name, w=300, h=300, bg='Current', framerate=24, more=''):
+        self.filename = name
+        self.w = w
+        self.h = h
+        self.bg = bg
+        self.count = 0
+
+        self.pipein, self.pipeout = os.pipe()
+        pid = os.getpid()
+        if os.path.exists(self.tmpfile):
+            os.remove(self.tmpfile)
+        os.symlink(f'/proc/{pid}/fd/{self.pipein}', self.tmpfile)
+
+        params = f'{self.ffmpeg} -y -f image2pipe -framerate {framerate} -i '
+        params += f'/proc/{pid}/fd/{self.pipeout} -vcodec png '
+        params += more
+        params += self.filename
+
+        self.p = subprocess.Popen(params.split(), stdin=None)
+
+    def addFrame(self):
+        view = Gui.activeDocument().activeView()
+        view.saveImage(self.tmpfile, self.w, self.h, self.bg)
+        self.count += 1
+        if self.count % 10 == 0:
+            App.Console.PrintMessage(f'Wrote {self.count} frames\n')
+            Gui.updateGui()
+
+    def end(self):
+        os.close(self.pipein)
+        os.close(self.pipeout)
+        self.p.wait()
+        os.remove(self.tmpfile)
+        App.Console.PrintMessage(f'Done wrote {self.count} frames\n')
+
+
+
+class Animation:
+
+    @staticmethod
+    def getObject():
+        return App.ActiveDocument.getObject('Animation')
+
+    @staticmethod
+    def getInstance():
+        return Animation(Animation.getObject())
+
+    def __init__(self, obj=None):
+        if not obj:
+            obj = App.ActiveDocument.addObject('App::DocumentObjectGroupPython', 'Animation')
+        self.steps = {}
+        for step in obj.Group:
+            self.steps[step.Name] = Step(step)
+        if not obj.Group:
+            self.addStep()
+        self.obj = obj
+        obj.Proxy = self
+        obj.ViewObject.Proxy = self
+        # Properties
+        newProp(obj, 'ExportVideo', 'Bool', False, 'Animation')
+        newProp(obj, 'Animate', 'Bool', False, 'Animation')
+        newProp(obj, 'OutputFilename', 'File', 'video.mp4', 'Video')
+        newProp(obj, 'FFmpeg', 'File', '', 'Video')
+        newProp(obj, 'Width', 'Integer', 1080, 'Video')
+        newProp(obj, 'Height', 'Integer', 720, 'Video')
+        newProp(obj, 'Background', 'Enumeration', [
+            'Current', 'Black', 'White', 'Transparent'
+        ], 'Video')
+        newProp(obj, 'FPS', 'Integer', 24, 'Video')
+
+    def onChanged(self, fp, prop):
+        App.Console.PrintMessage(f'onChanged {prop}\n')
+        if prop == 'ExportVideo':
+            if fp.getPropertyByName('ExportVideo'):
+                self.video()
+                setattr(fp, 'ExportVideo', False)
+                Gui.updateGui()
+        if prop == 'Animate':
+            if fp.getPropertyByName('Animate'):
+                self.play()
+                setattr(fp, 'Animate', False)
+                Gui.updateGui()
+        pass
+
+    def execute(self, fp):
+        App.Console.PrintMessage(f'execute {fp}\n')
+
+    def getIcon(self):
+        return f'{FILEPATH}/icons_i10g/animation.svg'
+
+    def addStep(self):
+        obj = App.ActiveDocument.addObject('App::DocumentObjectGroupPython', 'Step')
+        step = Step(obj)
+        self.steps[obj.Name] = step
+        Animation.getObject().addObject(obj)
+
+    def play(self):
+        prev = None
+        for step in self.steps.values():
+            if prev is None:
+                prev = step
+                continue
+            for delta in numpy.arange(0, 1, 1/(step.frames-1)):
+                step.anim(prev, delta)
+                Gui.updateGui()
+                time.sleep(0.01)
+
+    def video(self):
+        name = self.obj.getPropertyByName('OutputFilename')
+        w = self.obj.getPropertyByName('Width')
+        h = self.obj.getPropertyByName('Height')
+        bg = self.obj.getPropertyByName('Background')
+        fps = self.obj.getPropertyByName('FPS')
+        ffmpeg = self.obj.getPropertyByName('FFmpeg')
+        if not ffmpeg:
+            App.Console.PrintError(f'FFmpeg path not set!\n')
+            return
+        vr = VideoRenderer(ffmpeg)
+        vr.begin(name, w, h, bg, fps)
+        prev = None
+        for step in self.steps.values():
+            if prev is None:
+                prev = step
+                continue
+            for delta in numpy.arange(0, 1, 1/(step.frames-1)):
+                step.anim(prev, delta)
+                Gui.updateGui()
+                vr.addFrame()
+                # time.sleep(0.01)
+        vr.end()
+
+
+    def __getstate__(self):
+        return None
+
+    def __setstate__(self,state):
+        return None
+
+
+class Step:
+    def __init__(self, obj):
+        obj.Proxy = self
+        obj.ViewObject.Proxy = self
+        # Properties
+        newProp(obj, 'Frames', 'Integer', 30, 'Animation')
+        newProp(obj, 'State', 'PythonObject', getState())
+        self.state = copy.deepcopy(obj.getPropertyByName('State'))
+        self.frames = obj.getPropertyByName('Frames')
+        self.name = obj.Name
+        self.obj = obj
+
+        App.Console.PrintMessage(f'load state: {self.state}\n')
+        for value in self.state.values():
+            pos = [float(i) for i in re.findall('-?\d+\.?\d*', value['pos'])]
+            assert len(pos) == 16
+            value['pos'] = App.Placement(App.Matrix(*pos))
+        App.Console.PrintMessage(f'after state: {self.state}\n')
+
+    def onChanged(self, fp, prop):
+        App.Console.PrintMessage(f'onChanged\n')
+        if prop == 'Frames':
+            self.frames = self.obj.getPropertyByName('Frames')
+
+    def execute(self, fp):
+        App.Console.PrintMessage(f'execute\n')
+
+    def getIcon(self):
+        return f'{FILEPATH}/icons_i10g/step.svg'
+
+    def apply(self):
+        for objState in self.state.values():
+            applyObjState(objState)
+
+    def anim(self, prev, delta):
+        for name, objState in self.state.items():
+            animObjState(prev.state[name], objState, delta)
+
+    def __getstate__(self):
+        return None
+
+    def __setstate__(self,state):
+        return None
+
+
+class StepSelectionCallback:
+    def __init__(self):
+        Gui.Selection.addObserver(self)
+
+    def addSelection(self, doc, obj, sub, pos):
+        a = App.Animation.getInstance()
+        if obj in a.steps:
+            a.steps[obj].apply()
+
+
+if __name__ == '__main__':
+    StepSelectionCallback()
+    App.Animation = Animation
+    App.Animation.getInstance()
+
