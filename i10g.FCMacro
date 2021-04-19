@@ -245,7 +245,7 @@ class Animation:
             if prev is None:
                 prev = step
                 continue
-            for delta in numpy.append(numpy.arange(0, 1, 1/(step.frames-1)), 1):
+            for delta in numpy.append(numpy.arange(0, 1, 1/(prev.frames-1)), 1):
                 step.anim(prev, delta)
                 Gui.updateGui()
                 time.sleep(0.01)
@@ -280,7 +280,7 @@ class Animation:
             if prev is None:
                 prev = step
                 continue
-            for delta in numpy.append(numpy.arange(0, 1, 1/(step.frames-1)), 1):
+            for delta in numpy.append(numpy.arange(0, 1, 1/(prev.frames-1)), 1):
                 step.anim(prev, delta)
                 Gui.updateGui()
                 vr.addFrame()
