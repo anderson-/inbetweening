@@ -24,11 +24,18 @@ STATE = {
 def Doc():
     return App.ActiveDocument
 
+
+def log(msg):
+    App.Console.PrintLog(msg)
+
+
 def print(msg):
     App.Console.PrintMessage(msg)
 
+
 def warn(msg):
     App.Console.PrintWarning(msg)
+
 
 def err(msg):
     App.Console.PrintError(msg)
@@ -99,8 +106,6 @@ def animObjState(obj, s1, s2, delta):
     if not obj:
         return
     obj.Placement = s1['pos'].slerp(s2['pos'], delta)
-    # if obj.Visibility != s2['visible']:
-    #     obj.Visibility = s2['visible']
     m1 = s1.get('material')
     m2 = s2.get('material')
     if s1['visible'] == False and not m1:
@@ -128,11 +133,10 @@ def getState():
     for obj in objs:
         if hasattr(obj, 'Placement') and obj.TypeId not in IGNORELIST:
             if obj.TypeId not in ['App::Link', 'App::Part']:
-                App.Console.PrintWarning(f'warning: found {obj.FullName} as {obj.TypeId}\n')
+                warn(f'warning: found {obj.FullName} as {obj.TypeId}\n')
                 continue
             state[obj.Name] = createObjState(obj)
-
-    App.Console.PrintMessage(f'state: {state}\n')
+    log(f'state: {state}\n')
     return state
 
 
@@ -233,11 +237,10 @@ class Animation:
         newProp(obj, 'FPS', 'Integer', 24, 'Video')
 
     def onChanged(self, fp, prop):
-        App.Console.PrintMessage(f'onChanged {prop}\n')
         pass
 
     def execute(self, fp):
-        App.Console.PrintMessage(f'execute {fp}\n')
+        pass
 
     def getIcon(self):
         return f'{FILEPATH}/icons_i10g/animation.svg'
@@ -246,25 +249,20 @@ class Animation:
         if not before:
             id = 'Step{:0>3d}'.format(len(self.obj.Group))
             obj = Doc().addObject('App::DocumentObjectGroupPython', f'Step')
-            App.Console.PrintError(f'---{id}\n')
             obj.Label = id
             step = Step(obj, self.obj)
             self.steps[obj.Name] = step
             self.obj.addObject(obj)
-            App.Console.PrintError(f'addStep\n')
             STATE['frame'] = len(self.obj.Group) - 1
         else:
-            App.Console.PrintError(f'addStep{before}\n')
             tmp = Doc().addObject('App::DocumentObjectGroupPython', 'TMPGroup')
             for i in range(len(self.obj.Group) - before):
-                App.Console.PrintError(f'remove{before}\n')
                 obj = self.obj.removeObject(self.obj.Group[before])[0]
                 obj.Label = f'_{obj.Label}'
                 tmp.addObject(obj)
             self.addStep()
             id0 = len(self.obj.Group)
             for i in range(len(tmp.Group)):
-                App.Console.PrintError(f'add0\n')
                 obj = tmp.removeObject(tmp.Group[0])[0]
                 obj.Label = 'Step{:0>3d}'.format(id0 + i)
                 self.obj.addObject(obj)
@@ -313,7 +311,7 @@ class Animation:
         fps = self.obj.getPropertyByName('FPS')
         ffmpeg = self.obj.getPropertyByName('FFmpeg')
         if not ffmpeg:
-            App.Console.PrintError(f'FFmpeg path not set!\n')
+            err(f'FFmpeg path not set!\n')
             return
         vr = VideoRenderer(ffmpeg)
         vr.begin(name, w, h, bg, fps)
@@ -326,7 +324,6 @@ class Animation:
         for i, obj in enumerate(self.obj.Group):
             STATE['frame'] = i
             step = self.steps[obj.Name]
-            App.Console.PrintError(f'step {step.name}\n')
             if prev is None:
                 prev = step
                 continue
@@ -365,18 +362,15 @@ class Step:
         obj.ViewObject.signalChangeIcon()
 
     def onChanged(self, fp, prop):
-        App.Console.PrintMessage(f'onChanged\n')
         if prop == 'Frames':
             self.frames = self.obj.getPropertyByName('Frames')
 
     def execute(self, fp):
-        App.Console.PrintMessage(f'execute\n')
+        pass
 
     def getIcon(self):
         if STATE['frame'] == self.animation.Group.index(self.obj):
-            App.Console.PrintMessage(f'getIcon2 {id} {self.obj.Label}\n')
-            return f'{FILEPATH}/icons_i10g/selected_step.svg'
-        App.Console.PrintMessage(f'getIcon {id} {self.obj.Label}\n')
+            return f'{FILEPATH}/icons_i10g/selected_step.svg'')
         return f'{FILEPATH}/icons_i10g/step.svg'
 
     def updateState(self, force=False):
@@ -387,8 +381,7 @@ class Step:
         newProp(self.obj, 'DocState', 'PythonObject', getState())
         self.state = copy.deepcopy(self.obj.getPropertyByName('DocState'))
         self.frames = self.obj.getPropertyByName('Frames')
-
-        App.Console.PrintMessage(f'load state: {self.state}\n')
+        # Parse values
         for value in self.state.values():
             value['pos'] = App.Placement(App.Matrix(*value['pos']))
             if value['material']:
@@ -397,7 +390,6 @@ class Step:
                     value['transparency']
                 )
             value['obj'] = Doc().getObject(value['name'])
-        App.Console.PrintMessage(f'after state: {self.state}\n')
 
     def apply(self):
         for objState in self.state.values():
@@ -420,15 +412,12 @@ class DocObs():
         App.addDocumentObserver(self)
 
     def slotActivateDocument(self, doc):
-        App.Console.PrintMessage(f'slotActivateDocument frame {doc}\n')
         if doc != STATE['doc']:
             STATE['doc'] = doc
             if doc.getObject('Animation'):
                 STATE['animation'] = App.Animation.getInstance()
-                App.Console.PrintMessage(f'newAnimation\n')
             else:
                 STATE['animation'] = None
-                App.Console.PrintMessage(f'removeAnimation\n')
 
     def slotDeletedDocument(self, doc):
         if STATE['doc'] == doc:
@@ -436,13 +425,11 @@ class DocObs():
             STATE['animation'] = None
 
 
-
 class StepSelectionCallback:
     def __init__(self):
         Gui.Selection.addObserver(self)
 
     def addSelection(self, doc, obj, sub, pos):
-        App.Console.PrintMessage(f'addSelection frame {doc}\n')
         a = STATE['animation']
         if obj in a.steps:
             oldSelectedObj = a.obj.Group[STATE['frame']]
@@ -451,7 +438,6 @@ class StepSelectionCallback:
             oldSelectedObj.ViewObject.signalChangeIcon()
             selectedObj.ViewObject.signalChangeIcon()
             STATE['fcount'] = len(a.obj.Group)
-            App.Console.PrintMessage(f'Selected frame {STATE["frame"]}\n')
             a.steps[obj].apply()
 
 
@@ -464,7 +450,7 @@ class Inbetweening(Gui.Workbench):
         return 'Gui::PythonWorkbench'
 
     def Initialize(self):
-        App.Console.PrintMessage(f'Initialize workbench {id(self)}\n')
+        log(f'Initialize workbench {id(self)}\n')
         self.appendToolbar(f'TestTools{id(self)}', [
             'ReloadMacro', 'CreateAnimation', 'CreateExampleCmd',
         ])
@@ -480,14 +466,10 @@ class Inbetweening(Gui.Workbench):
         ])
 
     def Activated(self):
-        App.Console.PrintMessage(f'Activated\n')
         pass
 
     def Deactivated(self):
         pass
-
-    def ContextMenu(self, recipient):
-        App.Console.PrintMessage(f'ContextMenu\n')
 
 
 class ReloadMacro():
@@ -497,7 +479,7 @@ class ReloadMacro():
                 'ToolTip': 'Reload Macro'}
 
     def Activated(self):
-        App.Console.PrintMessage(f'Reloading macro. Command {id(self)}\n')
+        print(f'Reloading macro. Command {id(self)}\n')
         try:
             Gui.Selection.removeObserver(STATE['selection'])
             App.removeDocumentObserver(STATE['documentobs'])
@@ -519,7 +501,6 @@ class CreateAnimation():
                 'ToolTip': 'Create animation'}
 
     def Activated(self):
-        App.Console.PrintMessage(f'CreateAnimation\n')
         STATE['animation'] = App.Animation.getInstance()
 
     def IsActive(self):
@@ -642,6 +623,7 @@ class AddFrameCmd():
     def IsActive(self):
         return STATE['animation'] and not STATE['play']
 
+
 class CopyFrameCmd():
     def GetResources(self):
         return {
@@ -712,7 +694,7 @@ class RenderGIFCmd():
         params = f'{ffmpeg} -y -i {video} -pix_fmt rgb24 -loop 0 out.gif'
         p = subprocess.Popen(params.split(), stdin=None)
         p.wait()
-        App.Console.PrintMessage(f'Done\n')
+        print(f'Done\n')
 
     def IsActive(self):
         return STATE['animation'] and (not STATE['play']) and \
@@ -733,7 +715,7 @@ class RenderPNGCmd():
         bg = STATE['animation'].obj.getPropertyByName('Background')
         view = Gui.activeDocument().activeView()
         view.saveImage('frame.png', w, h, bg)
-        App.Console.PrintMessage(f'Done\n')
+        print(f'Done\n')
 
     def IsActive(self):
         return STATE['animation'] and (not STATE['play'])
@@ -753,6 +735,7 @@ class StopRenderCmd():
     def IsActive(self):
         return STATE['animation'] and STATE['play'] and STATE['render']
 
+
 class CreateExampleCmd():
     def GetResources(self):
         return {
@@ -762,13 +745,9 @@ class CreateExampleCmd():
         }
 
     def Activated(self):
-        App.Console.PrintMessage(f'new\n')
         doc = App.newDocument('AnimationExample')
-        App.Console.PrintMessage(f'setActive\n')
         App.setActiveDocument(doc.Name)
-        App.Console.PrintMessage(f'create\n')
         Gui.runCommand('CreateAnimation')
-        App.Console.PrintMessage(f'next\n')
 
         # create part
         p0 = doc.addObject('App::Part', 'Part')
@@ -791,6 +770,7 @@ class CreateExampleCmd():
         Gui.ActiveDocument.ActiveView.viewTrimetric()
         Gui.SendMsgToActiveView('ViewFit')
 
+        # update first step
         Gui.runCommand('UpdateFrameCmd')
 
         # set step 1
@@ -808,6 +788,7 @@ class CreateExampleCmd():
         doc.recompute()
         Gui.SendMsgToActiveView('ViewFit')
 
+        # add 2nd step
         Gui.runCommand('AddFrameCmd')
         Gui.runCommand('FirstFrameCmd')
 
