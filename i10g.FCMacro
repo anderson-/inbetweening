@@ -24,6 +24,15 @@ STATE = {
 def Doc():
     return App.ActiveDocument
 
+def print(msg):
+    App.Console.PrintMessage(msg)
+
+def warn(msg):
+    App.Console.PrintWarning(msg)
+
+def err(msg):
+    App.Console.PrintError(msg)
+
 
 def createObjState(obj):
     pos = str(obj.Placement.Matrix).split('Matrix')[1]
@@ -140,6 +149,7 @@ class VideoRenderer:
         self.ffmpeg = ffmpeg
         self.pipein, self.pipeout = (None, None)
         self.tmpfile = '/tmp/stream.png'
+        self.start = 0
 
     def begin(self, name, w=300, h=300, bg='Current', framerate=24, more=''):
         self.filename = name
@@ -147,6 +157,7 @@ class VideoRenderer:
         self.h = h
         self.bg = bg
         self.count = 0
+        self.start = time.time()
 
         self.pipein, self.pipeout = os.pipe()
         pid = os.getpid()
@@ -161,12 +172,15 @@ class VideoRenderer:
 
         self.p = subprocess.Popen(params.split(), stdin=None)
 
-    def addFrame(self):
+    def addFrame(self, total):
         view = Gui.activeDocument().activeView()
         view.saveImage(self.tmpfile, self.w, self.h, self.bg)
         self.count += 1
         if self.count % 10 == 0:
-            App.Console.PrintMessage(f'Wrote {self.count} frames\n')
+            dt = time.time() - self.start
+            left = (total * dt)/(self.count) - dt
+            fmt = '{:0>2.0f}:{:0>2.0f}'.format(left//60, left%60)
+            print(f'{fmt} remaining\n')
             Gui.updateGui()
 
     def end(self):
@@ -174,7 +188,10 @@ class VideoRenderer:
         os.close(self.pipeout)
         self.p.wait()
         os.remove(self.tmpfile)
-        App.Console.PrintMessage(f'Done wrote {self.count} frames\n')
+        dt = time.time() - self.start
+        fps = '{:.0f}'.format(self.count/dt)
+        dt = '{:.0f}'.format(dt)
+        print(f'Exported {self.count} frames in {dt}s ({fps} fps)\n')
 
 
 class Animation:
@@ -246,6 +263,13 @@ class Animation:
                 self.obj.addObject(obj)
             Doc().removeObject(tmp.Name)
 
+    def getTotalFrames(self):
+        tf = 0
+        for obj in self.obj.Group[:-1]:
+            step = self.steps[obj.Name]
+            tf += step.frames
+        return tf
+
     def play(self):
         prev = None
         Gui.Selection.clearSelection()
@@ -289,6 +313,7 @@ class Animation:
         STATE['play'] = True
         Gui.Selection.clearSelection()
         Gui.runCommand('Std_DrawStyle', 5)
+        tf = self.getTotalFrames()
         for i, obj in enumerate(self.obj.Group):
             STATE['frame'] = i
             step = self.steps[obj.Name]
@@ -301,7 +326,7 @@ class Animation:
             for delta in numpy.append(numpy.arange(0, 1, 1/(prev.frames-1)), 1):
                 step.anim(prev, delta)
                 Gui.updateGui()
-                vr.addFrame()
+                vr.addFrame(tf)
                 if not STATE['play']:
                     break
             prev = step
@@ -489,10 +514,6 @@ class CreateAnimation():
         STATE['animation'] = App.Animation.getInstance()
 
     def IsActive(self):
-        App.Console.PrintMessage(f'Reloading macro. Command {STATE["animation"]}\n')
-        App.Console.PrintMessage(f'Reloading macro. Command {App.ActiveDocument}\n')
-        App.Console.PrintMessage(f'Reloading macro. Command {App.ActiveDocument == STATE["doc"]}\n')
-
         return (not STATE['animation']) and App.ActiveDocument and \
             App.ActiveDocument == STATE['doc']
 
@@ -663,8 +684,8 @@ class RenderCmd():
         STATE['animation'].video()
 
     def IsActive(self):
-        return STATE['animation'] and not STATE['play'] and \
-            STATE['animation'].getPropertyByName('FFmpeg') != ''
+        return STATE['animation'] and (not STATE['play']) and \
+            STATE['animation'].obj.getPropertyByName('FFmpeg') != ''
 
 
 class StopRenderCmd():
@@ -778,6 +799,7 @@ def init():
 
 if __name__ == '__main__':
     App.Animation = Animation
+    App.STATE = STATE
     STATE['documentobs'] = DocObs()
     STATE['selection'] = StepSelectionCallback()
     init()
