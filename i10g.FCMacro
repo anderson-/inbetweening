@@ -88,14 +88,21 @@ def animObjState(obj, s1, s2, delta):
     if not obj:
         return
     obj.Placement = s1['pos'].slerp(s2['pos'], delta)
-    if obj.Visibility != s2['visible']:
-        obj.Visibility = s2['visible']
-    if obj.TypeId == 'App::Link' and ('material' in s1 or 'material' in s2):
-        if s1['material'] or s2['material']:
+    # if obj.Visibility != s2['visible']:
+    #     obj.Visibility = s2['visible']
+    m1 = s1.get('material')
+    m2 = s2.get('material')
+    if s1['visible'] == False and not m1:
+        m1 = newMaterial(None, 1)
+    if s2['visible'] == False and not m2:
+        m2 = newMaterial(None, 1)
+    if obj.TypeId == 'App::Link':
+        if m1 or m2:
+            obj.Visibility = True
             obj.ViewObject.OverrideMaterial = True
             obj.ViewObject.ShapeMaterial = interpolateMaterial(
-                s1['material'] or newMaterial(),
-                s2['material'] or newMaterial(),
+                m1 or newMaterial(),
+                m2 or newMaterial(),
                 delta
             )
         elif obj.ViewObject.OverrideMaterial:
