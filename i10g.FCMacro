@@ -476,7 +476,7 @@ class Inbetweening(Gui.Workbench):
             'AddFrameCmd', 'CopyFrameCmd', 'UpdateFrameCmd',
         ])
         self.appendToolbar(f'Render{id(self)}', [
-            'RenderCmd', 'StopRenderCmd',
+            'RenderPNGCmd', 'RenderCmd', 'RenderGIFCmd', 'StopRenderCmd',
         ])
 
     def Activated(self):
@@ -684,7 +684,7 @@ class UpdateFrameCmd():
 class RenderCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/icons_i10g/render.svg',
+            'Pixmap': f'{FILEPATH}/icons_i10g/video.svg',
             'MenuText': 'Render Animation',
             'ToolTip': 'Export video file',
         }
@@ -695,6 +695,48 @@ class RenderCmd():
     def IsActive(self):
         return STATE['animation'] and (not STATE['play']) and \
             STATE['animation'].obj.getPropertyByName('FFmpeg') != ''
+
+
+class RenderGIFCmd():
+    def GetResources(self):
+        return {
+            'Pixmap': f'{FILEPATH}/icons_i10g/gif.svg',
+            'MenuText': 'Render Animation',
+            'ToolTip': 'Export gif file',
+        }
+
+    def Activated(self):
+        STATE['animation'].video()
+        ffmpeg = STATE['animation'].obj.getPropertyByName('FFmpeg')
+        video = STATE['animation'].obj.getPropertyByName('OutputFilename')
+        params = f'{ffmpeg} -y -i {video} -pix_fmt rgb24 -loop 0 out.gif'
+        p = subprocess.Popen(params.split(), stdin=None)
+        p.wait()
+        App.Console.PrintMessage(f'Done\n')
+
+    def IsActive(self):
+        return STATE['animation'] and (not STATE['play']) and \
+            STATE['animation'].obj.getPropertyByName('FFmpeg') != ''
+
+
+class RenderPNGCmd():
+    def GetResources(self):
+        return {
+            'Pixmap': f'{FILEPATH}/icons_i10g/png.svg',
+            'MenuText': 'Render Frame',
+            'ToolTip': 'Export png file',
+        }
+
+    def Activated(self):
+        r = STATE['animation'].obj.getPropertyByName('Resolution')
+        w, h = (int(c) for c in r.split('x'))
+        bg = STATE['animation'].obj.getPropertyByName('Background')
+        view = Gui.activeDocument().activeView()
+        view.saveImage('frame.png', w, h, bg)
+        App.Console.PrintMessage(f'Done\n')
+
+    def IsActive(self):
+        return STATE['animation'] and (not STATE['play'])
 
 
 class StopRenderCmd():
@@ -788,6 +830,8 @@ def init():
         CopyFrameCmd,
         UpdateFrameCmd,
         RenderCmd,
+        RenderGIFCmd,
+        RenderPNGCmd,
         StopRenderCmd,
         CreateExampleCmd,
     ]
