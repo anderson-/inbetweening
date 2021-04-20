@@ -218,8 +218,15 @@ class Animation:
         # Properties
         newProp(obj, 'OutputFilename', 'File', 'video.mp4', 'Video')
         newProp(obj, 'FFmpeg', 'File', '', 'Video')
-        newProp(obj, 'Width', 'Integer', 1080, 'Video')
-        newProp(obj, 'Height', 'Integer', 720, 'Video')
+        newProp(obj, 'Resolution', 'Enumeration', [
+            '3840x2160',
+            '1920x1080',
+            '1280x720',
+            '960x540',
+            '640x360',
+            '400x224',
+        ], 'Video')
+        newProp(obj, 'CustomResolution', 'String', '', 'Video')
         newProp(obj, 'Background', 'Enumeration', [
             'Current', 'Black', 'White', 'Transparent'
         ], 'Video')
@@ -298,8 +305,10 @@ class Animation:
 
     def video(self):
         name = self.obj.getPropertyByName('OutputFilename')
-        w = self.obj.getPropertyByName('Width')
-        h = self.obj.getPropertyByName('Height')
+        r = self.obj.getPropertyByName('CustomResolution')
+        if not r:
+            r = self.obj.getPropertyByName('Resolution')
+        w, h = (int(c) for c in r.split('x'))
         bg = self.obj.getPropertyByName('Background')
         fps = self.obj.getPropertyByName('FPS')
         ffmpeg = self.obj.getPropertyByName('FFmpeg')
