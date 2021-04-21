@@ -6,10 +6,10 @@ import numpy
 import subprocess
 import FreeCAD as App
 import FreeCADGui as Gui
+from freecad.i10g import ICONPATH
 
 
 IGNORELIST = ['App::Origin', 'App::Line', 'App::Plane']
-FILEPATH = os.path.dirname(__file__) + '/icons_i10g'
 STATE = {
     'step': 0,
     'render': False,
@@ -266,7 +266,7 @@ class Animation:
         pass
 
     def getIcon(self):
-        return f'{FILEPATH}/animation.svg'
+        return f'{ICONPATH}/animation.svg'
 
     def addStep(self, before=None):
         if not before:
@@ -405,8 +405,8 @@ class Step:
 
     def getIcon(self):
         if STATE['step'] == self.animation.Group.index(self.obj):
-            return f'{FILEPATH}/selected_step.svg'
-        return f'{FILEPATH}/step.svg'
+            return f'{ICONPATH}/selected_step.svg'
+        return f'{ICONPATH}/step.svg'
 
     def updateState(self, force=False):
         if force:
@@ -450,7 +450,7 @@ class DocumentObserver():
         if doc != STATE['doc']:
             STATE['doc'] = doc
             if doc.getObject('Animation'):
-                STATE['animation'] = App.Animation.getInstance()
+                STATE['animation'] = Animation.getInstance()
             else:
                 STATE['animation'] = None
 
@@ -475,67 +475,16 @@ class SelectionObserver:
             a.steps[obj].apply()
 
 
-class Inbetweening(Gui.Workbench):
-    MenuText = 'Inbetweening'
-    ToolTip = 'Simple Animation Workbench'
-    Icon = f'{FILEPATH}/i10g.svg'
-
-    def GetClassName(self):
-        return 'Gui::PythonWorkbench'
-
-    def Initialize(self):
-        log(f'Initialize workbench {id(self)}')
-        self.appendToolbar(f'TestTools{id(self)}', [
-            'ReloadMacro', 'CreateAnimation', 'CreateExampleCmd',
-        ])
-        self.appendToolbar(f'Control{id(self)}', [
-            'FirstStepCmd', 'PrevStepCmd', 'PlayCtrlCmd',
-            'PauseCtrlCmd', 'NextStepCmd', 'LastStepCmd',
-        ])
-        self.appendToolbar(f'Tools{id(self)}', [
-            'AddStepCmd', 'CopyStepCmd', 'UpdateStepCmd',
-        ])
-        self.appendToolbar(f'Render{id(self)}', [
-            'RenderPNGCmd', 'RenderCmd', 'RenderGIFCmd', 'StopRenderCmd',
-        ])
-
-    def Activated(self):
-        pass
-
-    def Deactivated(self):
-        pass
-
-
-class ReloadMacro():
-    def GetResources(self):
-        return {'Pixmap': f'{FILEPATH}/reload.svg',
-                'MenuText': 'Reload macro',
-                'ToolTip': 'Reload macro'}
-
-    def Activated(self):
-        print(f'Reloading macro. Command {id(self)}')
-        try:
-            Gui.Selection.removeObserver(STATE['selObs'])
-            App.removeDocumentObserver(STATE['docObs'])
-        except:
-            pass
-        Gui.activateWorkbench('StartWorkbench')
-        Gui.removeWorkbench('Inbetweening')
-        Gui.runCommand('Std_RecentMacros', 0)
-        Gui.activateWorkbench('Inbetweening')
-
-    def IsActive(self):
-        return True
 
 
 class CreateAnimation():
     def GetResources(self):
-        return {'Pixmap': f'{FILEPATH}/i10g.svg',
+        return {'Pixmap': f'{ICONPATH}/i10g.svg',
                 'MenuText': 'Create animation',
                 'ToolTip': 'Create animation'}
 
     def Activated(self):
-        STATE['animation'] = App.Animation.getInstance()
+        STATE['animation'] = Animation.getInstance()
 
     def IsActive(self):
         return (not STATE['animation']) and App.ActiveDocument and \
@@ -545,7 +494,7 @@ class CreateAnimation():
 class FirstStepCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/first.svg',
+            'Pixmap': f'{ICONPATH}/first.svg',
             'MenuText': 'Jump to first step',
             'ToolTip': 'Jump to first step',
         }
@@ -562,7 +511,7 @@ class FirstStepCmd():
 class PrevStepCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/prev.svg',
+            'Pixmap': f'{ICONPATH}/prev.svg',
             'MenuText': 'Previous step',
             'ToolTip': 'Previous step',
         }
@@ -579,7 +528,7 @@ class PrevStepCmd():
 class PlayCtrlCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/play.svg',
+            'Pixmap': f'{ICONPATH}/play.svg',
             'MenuText': 'Play animation',
             'ToolTip': 'Play animation',
         }
@@ -594,7 +543,7 @@ class PlayCtrlCmd():
 class PauseCtrlCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/pause.svg',
+            'Pixmap': f'{ICONPATH}/pause.svg',
             'MenuText': 'Pause animation',
             'ToolTip': 'Pause animation',
         }
@@ -609,7 +558,7 @@ class PauseCtrlCmd():
 class NextStepCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/next.svg',
+            'Pixmap': f'{ICONPATH}/next.svg',
             'MenuText': 'Next step',
             'ToolTip': 'Next step',
         }
@@ -627,7 +576,7 @@ class NextStepCmd():
 class LastStepCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/last.svg',
+            'Pixmap': f'{ICONPATH}/last.svg',
             'MenuText': 'Jump to last step',
             'ToolTip': 'Jump to last step',
         }
@@ -645,7 +594,7 @@ class LastStepCmd():
 class AddStepCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/add.svg',
+            'Pixmap': f'{ICONPATH}/add.svg',
             'MenuText': 'Add step',
             'ToolTip': 'Add step',
         }
@@ -661,7 +610,7 @@ class AddStepCmd():
 class CopyStepCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/copy.svg',
+            'Pixmap': f'{ICONPATH}/copy.svg',
             'MenuText': 'Copy step',
             'ToolTip': 'Copy step',
         }
@@ -683,7 +632,7 @@ class CopyStepCmd():
 class UpdateStepCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/update.svg',
+            'Pixmap': f'{ICONPATH}/update.svg',
             'MenuText': 'Update step',
             'ToolTip': 'Update step',
         }
@@ -700,7 +649,7 @@ class UpdateStepCmd():
 class RenderCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/video.svg',
+            'Pixmap': f'{ICONPATH}/video.svg',
             'MenuText': 'Render Animation',
             'ToolTip': 'Export video file',
         }
@@ -716,7 +665,7 @@ class RenderCmd():
 class RenderGIFCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/gif.svg',
+            'Pixmap': f'{ICONPATH}/gif.svg',
             'MenuText': 'Render Animation',
             'ToolTip': 'Export gif file',
         }
@@ -741,7 +690,7 @@ class RenderGIFCmd():
 class RenderPNGCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/png.svg',
+            'Pixmap': f'{ICONPATH}/png.svg',
             'MenuText': 'Render Frame',
             'ToolTip': 'Export png file',
         }
@@ -764,7 +713,7 @@ class RenderPNGCmd():
 class StopRenderCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/abort.svg',
+            'Pixmap': f'{ICONPATH}/abort.svg',
             'MenuText': 'Abort Render',
             'ToolTip': 'Cancel export',
         }
@@ -779,7 +728,7 @@ class StopRenderCmd():
 class CreateExampleCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/animation.svg',
+            'Pixmap': f'{ICONPATH}/animation.svg',
             'MenuText': 'Open Example',
             'ToolTip': 'Open eample',
         }
@@ -838,7 +787,6 @@ class CreateExampleCmd():
 
 def init():
     # Commands
-    Gui.addCommand('ReloadMacro', ReloadMacro())
     cmds = [
         CreateAnimation,
         FirstStepCmd,
@@ -859,21 +807,7 @@ def init():
     for cmd in cmds:
         Gui.addCommand(cmd.__name__, cmd())
 
-    # Workbench
-    try:
-        Gui.activateWorkbench('Inbetweening')
-        Gui.removeWorkbench('Inbetweening')
-    except:
-        pass
-    Gui.addWorkbench(Inbetweening())
-    Gui.activateWorkbench('Inbetweening')
-    if App.ActiveDocument:
-        App.setActiveDocument(App.ActiveDocument.Name)
-
-
-if __name__ == '__main__':
-    App.Animation = Animation
-    App.STATE = STATE
     STATE['selObs'] = SelectionObserver()
     STATE['docObs'] = DocumentObserver()
-    init()
+
+
