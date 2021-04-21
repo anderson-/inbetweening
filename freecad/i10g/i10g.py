@@ -730,7 +730,7 @@ class CreateExampleCmd():
         return {
             'Pixmap': f'{ICONPATH}/animation.svg',
             'MenuText': 'Open Example',
-            'ToolTip': 'Open eample',
+            'ToolTip': 'Open example',
         }
 
     def Activated(self):
