@@ -18,6 +18,7 @@ STATE = {
     'selObs': None,
     'docObs': None,
     'doc': None,
+    'GUIFPS': 24,
 }
 
 
@@ -147,6 +148,13 @@ def newProp(obj, name, type_, value, subsection="", tooltip=""):
     setattr(obj, name, value)
 
 
+def getDeltas(frames, last):
+    array = numpy.arange(0, 1, 1 / frames)
+    if last:
+        numpy.append(array, 1)
+    return array
+
+
 class VideoRenderer:
 
     def __init__(self, ffmpeg):
@@ -270,16 +278,21 @@ class Animation:
 
     def getTotalFrames(self):
         tf = 0
+        fps = self.obj.getPropertyByName('FPS')
         for obj in self.obj.Group[:-1]:
             step = self.steps[obj.Name]
-            tf += step.frames
-        return tf
+            tf += step.ds * fps
+        return int(tf)
 
     def play(self):
         prev = None
         Gui.Selection.clearSelection()
         Gui.runCommand('Std_DrawStyle', 5)
         STATE['play'] = True
+        guifps = STATE['GUIFPS']
+        framecount = 0
+        start = time.time()
+        count = len(self.obj.Group)
         for i, obj in enumerate(self.obj.Group):
             STATE['step'] = i
             step = self.steps[obj.Name]
@@ -288,15 +301,19 @@ class Animation:
                 continue
             prev.obj.ViewObject.signalChangeIcon()
             step.obj.ViewObject.signalChangeIcon()
-            for delta in numpy.append(numpy.arange(0, 1, 1/(prev.frames-1)), 1):
+            for delta in getDeltas(guifps, i == count - 1):
                 step.anim(prev, delta)
+                framecount += 1
                 Gui.updateGui()
                 time.sleep(0.01)
                 if not STATE['play']:
                     break
+            guifps = numpy.max((framecount / (time.time() - start), 3))
             prev = step
             if not STATE['play']:
                 break
+        STATE['GUIFPS'] = guifps
+        print(f'{int(guifps)} fps')
         STATE['play'] = False
         Gui.runCommand('Std_DrawStyle', 6)
         Doc().recompute(None, True, True)
@@ -321,6 +338,7 @@ class Animation:
         Gui.Selection.clearSelection()
         Gui.runCommand('Std_DrawStyle', 5)
         tf = self.getTotalFrames()
+        count = len(self.obj.Group)
         for i, obj in enumerate(self.obj.Group):
             STATE['step'] = i
             step = self.steps[obj.Name]
@@ -329,7 +347,8 @@ class Animation:
                 continue
             prev.obj.ViewObject.signalChangeIcon()
             step.obj.ViewObject.signalChangeIcon()
-            for delta in numpy.append(numpy.arange(0, 1, 1/(prev.frames-1)), 1):
+            frames = prev.ds * fps
+            for delta in getDeltas(frames, i == count - 1):
                 step.anim(prev, delta)
                 Gui.updateGui()
                 vr.addFrame(tf)
@@ -363,8 +382,8 @@ class Step:
         obj.ViewObject.signalChangeIcon()
 
     def onChanged(self, fp, prop):
-        if prop == 'Frames':
-            self.frames = self.obj.getPropertyByName('Frames')
+        if prop == 'DurationInSeconds':
+            self.ds = self.obj.getPropertyByName('DurationInSeconds')
 
     def execute(self, fp):
         pass
@@ -378,10 +397,10 @@ class Step:
         if force:
             self.obj.removeProperty('DocState')
         # Properties
-        newProp(self.obj, 'Frames', 'Integer', 30, 'Animation')
+        newProp(self.obj, 'DurationInSeconds', 'Integer', 1, 'Animation')
         newProp(self.obj, 'DocState', 'PythonObject', getState())
         self.state = copy.deepcopy(self.obj.getPropertyByName('DocState'))
-        self.frames = self.obj.getPropertyByName('Frames')
+        self.ds = self.obj.getPropertyByName('DurationInSeconds')
         # Parse values
         for value in self.state.values():
             value['pos'] = App.Placement(App.Matrix(*value['pos']))
