@@ -13,8 +13,7 @@ class Inbetweening(Gui.Workbench):
 
     def Initialize(self):
         App.Console.PrintLog(f'Initialize inbetweening workbench')
-        import freecad.i10g.i10g as i10g
-        i10g.init()
+        import freecad.i10g.commands
         self.appendToolbar(f'TestTools', [
             'CreateAnimation', 'CreateExampleCmd',
         ])
@@ -28,6 +27,9 @@ class Inbetweening(Gui.Workbench):
         self.appendToolbar(f'Render', [
             'RenderPNGCmd', 'RenderCmd', 'RenderGIFCmd', 'StopRenderCmd',
         ])
+        import freecad.i10g.i10g as i10g
+        i10g.STATE['selObs'] = i10g.SelectionObserver()
+        i10g.STATE['docObs'] = i10g.DocumentObserver()
 
     def Activated(self):
         pass
