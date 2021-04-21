@@ -148,10 +148,10 @@ def newProp(obj, name, type_, value, subsection="", tooltip=""):
     setattr(obj, name, value)
 
 
-def getDeltas(frames, last):
+def getDeltas(frames, last=False):
     array = numpy.arange(0, 1, 1 / frames)
     if last:
-        numpy.append(array, 1)
+        array = numpy.append(array, 1)
     return array
 
 
@@ -202,8 +202,8 @@ class VideoRenderer:
         os.remove(self.tmpfile)
         dt = time.time() - self.start
         fps = '{:.0f}'.format(self.count/dt)
-        dt = '{:.0f}'.format(dt)
-        print(f'Exported {self.count} frames in {dt}s ({fps} fps)')
+        dt = '{:0>2.0f}:{:0>2.0f}'.format(dt//60, dt%60)
+        print(f'Exported {self.count} frames in {dt} ({fps} fps)')
 
 
 class Animation:
@@ -231,13 +231,28 @@ class Animation:
         newProp(obj, 'OutputFilename', 'File', 'video.mp4', 'Video')
         newProp(obj, 'FFmpeg', 'File', '', 'Video')
         newProp(obj, 'Resolution', 'Enumeration', [
-            '3840x2160',
-            '1920x1080',
-            '1280x720',
-            '960x540',
+            '320x240',
+            '640x480',
+            '800x600',
+            '960x720',
+            '1024x768',
+            '1280x960',
+            '1400x1050',
+            '1440x1080',
+            '1600x1200',
+            '1920x1440',
+            '2048x1536',
+            '426x240',
             '640x360',
-            '400x224',
+            '854x480',
+            '1280x720',
+            '1920x1080',
+            '2560x1440',
+            '3840x2160',
+            '7680x4320',
+            '15360x8640',
         ], 'Video')
+        obj.Resolution = '1280x720'
         newProp(obj, 'CustomResolution', 'String', '', 'Video')
         newProp(obj, 'Background', 'Enumeration', [
             'Current', 'Black', 'White', 'Transparent'
@@ -707,13 +722,16 @@ class RenderGIFCmd():
         }
 
     def Activated(self):
+        start = time.time()
         STATE['animation'].video()
         ffmpeg = STATE['animation'].obj.getPropertyByName('FFmpeg')
         video = STATE['animation'].obj.getPropertyByName('OutputFilename')
         params = f'{ffmpeg} -y -i {video} -pix_fmt rgb24 -loop 0 out.gif'
         p = subprocess.Popen(params.split(), stdin=None)
         p.wait()
-        print(f'Done')
+        dt = time.time() - start
+        dt = '{:0>2.0f}:{:0>2.0f}'.format(dt//60, dt%60)
+        print(f'Done in {dt}')
 
     def IsActive(self):
         return STATE['animation'] and (not STATE['play']) and \
@@ -729,12 +747,15 @@ class RenderPNGCmd():
         }
 
     def Activated(self):
+        start = time.time()
         r = STATE['animation'].obj.getPropertyByName('Resolution')
         w, h = (int(c) for c in r.split('x'))
         bg = STATE['animation'].obj.getPropertyByName('Background')
         view = Gui.activeDocument().activeView()
         view.saveImage('frame.png', w, h, bg)
-        print(f'Done')
+        dt = time.time() - start
+        dt = '{:0>2.0f}:{:0>2.0f}'.format(dt//60, dt%60)
+        print(f'Done in {dt}')
 
     def IsActive(self):
         return STATE['animation'] and (not STATE['play'])
