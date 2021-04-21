@@ -9,7 +9,7 @@ import FreeCADGui as Gui
 
 
 IGNORELIST = ['App::Origin', 'App::Line', 'App::Plane']
-FILEPATH = os.path.dirname(__file__)
+FILEPATH = os.path.dirname(__file__) + '/icons_i10g'
 STATE = {
     'step': 0,
     'render': False,
@@ -266,7 +266,7 @@ class Animation:
         pass
 
     def getIcon(self):
-        return f'{FILEPATH}/icons_i10g/animation.svg'
+        return f'{FILEPATH}/animation.svg'
 
     def addStep(self, before=None):
         if not before:
@@ -405,8 +405,8 @@ class Step:
 
     def getIcon(self):
         if STATE['step'] == self.animation.Group.index(self.obj):
-            return f'{FILEPATH}/icons_i10g/selected_step.svg'
-        return f'{FILEPATH}/icons_i10g/step.svg'
+            return f'{FILEPATH}/selected_step.svg'
+        return f'{FILEPATH}/step.svg'
 
     def updateState(self, force=False):
         if force:
@@ -478,7 +478,7 @@ class SelectionObserver:
 class Inbetweening(Gui.Workbench):
     MenuText = 'Inbetweening'
     ToolTip = 'Simple Animation Workbench'
-    Icon = f'{FILEPATH}/icons_i10g/i10g.svg'
+    Icon = f'{FILEPATH}/i10g.svg'
 
     def GetClassName(self):
         return 'Gui::PythonWorkbench'
@@ -508,7 +508,7 @@ class Inbetweening(Gui.Workbench):
 
 class ReloadMacro():
     def GetResources(self):
-        return {'Pixmap': f'{FILEPATH}/icons_i10g/reload.svg',
+        return {'Pixmap': f'{FILEPATH}/reload.svg',
                 'MenuText': 'Reload macro',
                 'ToolTip': 'Reload macro'}
 
@@ -530,7 +530,7 @@ class ReloadMacro():
 
 class CreateAnimation():
     def GetResources(self):
-        return {'Pixmap': f'{FILEPATH}/icons_i10g/i10g.svg',
+        return {'Pixmap': f'{FILEPATH}/i10g.svg',
                 'MenuText': 'Create animation',
                 'ToolTip': 'Create animation'}
 
@@ -545,7 +545,7 @@ class CreateAnimation():
 class FirstStepCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/icons_i10g/first.svg',
+            'Pixmap': f'{FILEPATH}/first.svg',
             'MenuText': 'Jump to first step',
             'ToolTip': 'Jump to first step',
         }
@@ -562,7 +562,7 @@ class FirstStepCmd():
 class PrevStepCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/icons_i10g/prev.svg',
+            'Pixmap': f'{FILEPATH}/prev.svg',
             'MenuText': 'Previous step',
             'ToolTip': 'Previous step',
         }
@@ -579,7 +579,7 @@ class PrevStepCmd():
 class PlayCtrlCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/icons_i10g/play.svg',
+            'Pixmap': f'{FILEPATH}/play.svg',
             'MenuText': 'Play animation',
             'ToolTip': 'Play animation',
         }
@@ -594,7 +594,7 @@ class PlayCtrlCmd():
 class PauseCtrlCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/icons_i10g/pause.svg',
+            'Pixmap': f'{FILEPATH}/pause.svg',
             'MenuText': 'Pause animation',
             'ToolTip': 'Pause animation',
         }
@@ -609,7 +609,7 @@ class PauseCtrlCmd():
 class NextStepCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/icons_i10g/next.svg',
+            'Pixmap': f'{FILEPATH}/next.svg',
             'MenuText': 'Next step',
             'ToolTip': 'Next step',
         }
@@ -627,7 +627,7 @@ class NextStepCmd():
 class LastStepCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/icons_i10g/last.svg',
+            'Pixmap': f'{FILEPATH}/last.svg',
             'MenuText': 'Jump to last step',
             'ToolTip': 'Jump to last step',
         }
@@ -645,7 +645,7 @@ class LastStepCmd():
 class AddStepCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/icons_i10g/add.svg',
+            'Pixmap': f'{FILEPATH}/add.svg',
             'MenuText': 'Add step',
             'ToolTip': 'Add step',
         }
@@ -661,7 +661,7 @@ class AddStepCmd():
 class CopyStepCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/icons_i10g/copy.svg',
+            'Pixmap': f'{FILEPATH}/copy.svg',
             'MenuText': 'Copy step',
             'ToolTip': 'Copy step',
         }
@@ -683,7 +683,7 @@ class CopyStepCmd():
 class UpdateStepCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/icons_i10g/update.svg',
+            'Pixmap': f'{FILEPATH}/update.svg',
             'MenuText': 'Update step',
             'ToolTip': 'Update step',
         }
@@ -700,7 +700,7 @@ class UpdateStepCmd():
 class RenderCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/icons_i10g/video.svg',
+            'Pixmap': f'{FILEPATH}/video.svg',
             'MenuText': 'Render Animation',
             'ToolTip': 'Export video file',
         }
@@ -716,7 +716,7 @@ class RenderCmd():
 class RenderGIFCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/icons_i10g/gif.svg',
+            'Pixmap': f'{FILEPATH}/gif.svg',
             'MenuText': 'Render Animation',
             'ToolTip': 'Export gif file',
         }
@@ -741,7 +741,7 @@ class RenderGIFCmd():
 class RenderPNGCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/icons_i10g/png.svg',
+            'Pixmap': f'{FILEPATH}/png.svg',
             'MenuText': 'Render Frame',
             'ToolTip': 'Export png file',
         }
@@ -764,7 +764,7 @@ class RenderPNGCmd():
 class StopRenderCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/icons_i10g/abort.svg',
+            'Pixmap': f'{FILEPATH}/abort.svg',
             'MenuText': 'Abort Render',
             'ToolTip': 'Cancel export',
         }
@@ -779,7 +779,7 @@ class StopRenderCmd():
 class CreateExampleCmd():
     def GetResources(self):
         return {
-            'Pixmap': f'{FILEPATH}/icons_i10g/animation.svg',
+            'Pixmap': f'{FILEPATH}/animation.svg',
             'MenuText': 'Open Example',
             'ToolTip': 'Open eample',
         }
