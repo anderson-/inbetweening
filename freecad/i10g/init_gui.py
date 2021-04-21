@@ -12,19 +12,26 @@ class Inbetweening(Gui.Workbench):
         return 'Gui::PythonWorkbench'
 
     def Initialize(self):
-        App.Console.PrintLog(f'Initialize inbetweening workbench')
+        App.Console.PrintLog(f'Initialize inbetweening workbench\n')
         import freecad.i10g.commands
-        self.appendToolbar(f'TestTools', [
+        import freecad.i10g.reload
+        I = ''
+        if getattr(App, 'DEV', False):
+            I = id(self)
+            self.appendToolbar(f'DevTools{I}', [
+                'ReloadWorkbench',
+            ])
+        self.appendToolbar(f'Tools{I}', [
             'CreateAnimation', 'CreateExampleCmd',
         ])
-        self.appendToolbar(f'Control', [
+        self.appendToolbar(f'Control{I}', [
             'FirstStepCmd', 'PrevStepCmd', 'PlayCtrlCmd',
             'PauseCtrlCmd', 'NextStepCmd', 'LastStepCmd',
         ])
-        self.appendToolbar(f'Tools', [
+        self.appendToolbar(f'Tools{I}', [
             'AddStepCmd', 'CopyStepCmd', 'UpdateStepCmd',
         ])
-        self.appendToolbar(f'Render', [
+        self.appendToolbar(f'Render{I}', [
             'RenderPNGCmd', 'RenderCmd', 'RenderGIFCmd', 'StopRenderCmd',
         ])
         import freecad.i10g.i10g as i10g

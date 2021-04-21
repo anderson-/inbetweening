@@ -1,6 +1,6 @@
+from .i10g import *
 import FreeCAD as App
 import FreeCADGui as Gui
-from freecad.i10g.i10g import *
 
 
 class CreateAnimation():
