@@ -40,7 +40,7 @@ Inbetweening (*abbreviated as i10g*) is a WYSIWYG (What You See Is What You Get)
 *Please check if the current python environment is the same used in your installation of FreeCAD*
 
 ```
-python3 -m pip install i10g
+python3 -m pip install freecad.i10g
 ```
 
 or
