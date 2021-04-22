@@ -165,11 +165,12 @@ def getState():
     return state
 
 
-def newProp(obj, name, type_, value, subsection="", tooltip=""):
+def newProp(obj, name, type_, value, subsection='', tooltip='', default=None):
     if name in obj.PropertiesList:
-        return
+        return False
     obj.addProperty(f'App::Property{type_}', name, subsection, tooltip)
     setattr(obj, name, value)
+    return True
 
 
 def getDeltas(frames, last=False):
@@ -254,8 +255,8 @@ class Animation:
         # Properties
         newProp(obj, 'OutputFilename', 'File', 'video.mp4', 'Video')
         newProp(obj, 'FFmpeg', 'File', '', 'Video')
-        newProp(obj, 'Resolution', 'Enumeration', DEF_RES, 'Video')
-        obj.Resolution = '1280x720'
+        if newProp(obj, 'Resolution', 'Enumeration', DEF_RES, 'Video'):
+            obj.Resolution = '1280x720'
         newProp(obj, 'CustomResolution', 'String', '', 'Video')
         newProp(obj, 'Background', 'Enumeration', [
             'Current', 'Black', 'White', 'Transparent'
