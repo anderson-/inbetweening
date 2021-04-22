@@ -201,7 +201,13 @@ class RenderGIFCmd():
         STATE['animation'].video()
         ffmpeg = STATE['animation'].obj.getPropertyByName('FFmpeg')
         video = STATE['animation'].obj.getPropertyByName('OutputFilename')
-        params = f'{ffmpeg} -y -i {video} -pix_fmt rgb24 -loop 0 out.gif'
+        res = STATE['animation'].obj.getPropertyByName('Resolution')
+        params = f'{ffmpeg} -y -i {video} -vf palettegen /tmp/palette.png'
+        p = subprocess.Popen(params.split(), stdin=None)
+        p.wait()
+        outfile = os.path.splitext(video)[0]
+        params = f'{ffmpeg} -y -i {video} -i /tmp/palette.png '
+        params += f'-filter_complex paletteuse {outfile}.gif'
         p = subprocess.Popen(params.split(), stdin=None)
         p.wait()
         dt = time.time() - start
