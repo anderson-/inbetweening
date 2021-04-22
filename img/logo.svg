@@ -7,13 +7,13 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="24"
-   height="24"
-   viewBox="0 0 36 36"
+   width="128"
+   height="128"
+   viewBox="0 0 192 192"
    fill="none"
    version="1.1"
    id="svg12"
-   sodipodi:docname="i10g.svg"
+   sodipodi:docname="logo.svg"
    inkscape:version="1.0.1 (3bc2e813f5, 2020-09-07)">
   <metadata
      id="metadata18">
@@ -42,9 +42,9 @@
      inkscape:window-height="1016"
      id="namedview14"
      showgrid="false"
-     inkscape:zoom="16"
-     inkscape:cx="23.118026"
-     inkscape:cy="8.9153742"
+     inkscape:zoom="4"
+     inkscape:cx="21.721341"
+     inkscape:cy="54.46906"
      inkscape:window-x="0"
      inkscape:window-y="27"
      inkscape:window-maximized="1"
@@ -52,7 +52,7 @@
      inkscape:document-rotation="0" />
   <g
      id="g902"
-     transform="translate(-0.09888439,-0.0494048)">
+     transform="matrix(5.548239,0,0,5.548239,-4.3195351,-4.0450104)">
     <g
        id="g849"
        style="fill:#e24a68;fill-opacity:1"
