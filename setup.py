@@ -6,6 +6,9 @@ version_path = os.path.join(os.path.abspath(os.path.dirname(__file__)),
 with open(version_path) as fp:
     exec(fp.read())
 
+with open('README.md', 'r', encoding='utf-8') as fh:
+    long_description = fh.read()
+
 setup(name='freecad.i10g',
       version=str(__version__),
       packages=['freecad',
@@ -14,5 +17,7 @@ setup(name='freecad.i10g',
       maintainer_email='anderson.utf@gmail.com',
       url='https://github.com/anderson-/inbetweening',
       description='FreeCAD Simple Animation Workbench',
+      long_description=long_description,
+      long_description_content_type='text/markdown',
       install_requires=['numpy'],
       include_package_data=True)
